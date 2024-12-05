@@ -7,6 +7,13 @@ const jwtToken = require('jsonwebtoken')
 const ConnectDb = require('./config/dbConnect')
 const userData = require('./models/users')
 const products = require('./models/products')
+const path = require('path');
+app.use(express.static(path.join(__dirname, 'frontend/build')));
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'frontend/build', 'index.html'));
+});
+
 
 const app = express()
 app.use(express.json())
@@ -28,6 +35,16 @@ mongoose.connection.on('error', (err) => {
   console.log(`${err.message}`)
 })
 
+require('dotenv').config();
+
+const MONGO_URI = process.env.MONGO_URI;
+const MY_SECRET_TOKEN = process.env.MY_SECRET_TOKEN;
+
+mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log("MongoDB Connected"))
+  .catch((err) => console.error("Database Connection Error:", err));
+
+  
 app.post('/api/register', async (req, res) => {
   const { username, email, phone, password } = req.body
   const hashedPassword = await bcrypt.hash(password, 10)
@@ -82,6 +99,15 @@ const authorization = (req, res, next) => {
     })
   }
 }
+
+const cors = require('cors');
+app.use(cors({ origin: 'https://starting-valkyrie-6399c9.netlify.app' }));
+
+
+app.get('/', (req, res) => {
+  res.send('Welcome to the Backend!');
+});
+
 
 app.get('/api/products', authorization, async (req, res) => {
   const allProducts = await products.find({})
