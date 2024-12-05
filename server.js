@@ -8,6 +8,15 @@ const path = require('path');
 const ConnectDb = require('./config/dbConnect');
 const userData = require('./models/users');
 const products = require('./models/products');
+const productSchema = new mongoose.Schema({
+  id: String,
+  productName: String,
+  description: String,
+  price: Number,
+  specs: Object,
+  image: String
+});
+module.exports = mongoose.model('products', productSchema);
 
 // Initialize Express App
 const app = express();
@@ -63,21 +72,20 @@ app.post('/api/register', async (req, res) => {
   const { username, email, phone, password } = req.body;
   const hashedPassword = await bcrypt.hash(password, 10);
   const checkUser = await userData.findOne({ username });
-
   if (checkUser) {
-    return res.status(422).send('User Already Exists');
+    return res.status(422).send('User Already exists');
+  } else {
+    const newUser = new userData({
+      username,
+      email,
+      phone,
+      password: `${hashedPassword}`,
+    });
+    await newUser.save();
+    res.status(201).send('Registered Successfully');
   }
-
-  const newUser = new userData({
-    username,
-    email,
-    phone,
-    password: hashedPassword,
-  });
-
-  await newUser.save();
-  res.status(201).send('Registered Successfully');
 });
+
 
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
@@ -97,14 +105,15 @@ app.post('/api/login', async (req, res) => {
   res.send({ status: 'ok', token });
 });
 
-app.get('/api/products', authorization, async (req, res) => {
+app.get('/api/products', async (req, res) => {
   const allProducts = await products.find({});
   res.send(allProducts);
 });
 
-app.get('/api/products/:id', authorization, async (req, res) => {
+
+app.get('/api/products/:id', async (req, res) => {
   const { id } = req.params;
-  const singleProduct = await products.findOne({ id });
+  const singleProduct = await products.findOne({ id: id.toString() });
   if (!singleProduct) {
     return res.status(404).send('Product Not Found');
   }
