@@ -34,9 +34,9 @@ const apiLimiter = rateLimit({
 app.use('/api', apiLimiter);
 
 // Environment Variables
-const PORT = process.env.PORT || 3020;
-const MONGO_URI = process.env.MONGO_URI;
-const MY_SECRET_TOKEN = process.env.MY_SECRET_TOKEN;
+const PORT =  3020;
+const MONGO_URI =  "mongodb+srv://admin:Admin@123@cluster0.zbool.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+//const MY_SECRET_TOKEN = process.env.MY_SECRET_TOKEN;
 
 // Connect to MongoDB
 mongoose.connect(MONGO_URI, {
