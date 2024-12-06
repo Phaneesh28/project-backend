@@ -5,34 +5,48 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwtToken = require('jsonwebtoken');
 const path = require('path');
-const products = require('./models/products'); // Import Product Schema
-const userData = require('./models/users'); // Import User Schema
+const helmet = require('helmet'); // Security headers
+const morgan = require('morgan'); // Logging
+const mongoSanitize = require('express-mongo-sanitize'); // Sanitize inputs
+const rateLimit = require('express-rate-limit'); // Rate limiting
+
+// Import Models
+const products = require('./models/products');
+const userData = require('./models/users');
 
 const app = express();
-app.use(express.json());
 
-// Restrict CORS to specific origins in production
-const allowedOrigins = ['http://localhost:3000', 'https://your-frontend-url.com'];
+// Middleware
+app.use(express.json());
+app.use(helmet());
+app.use(mongoSanitize());
+app.use(morgan('combined')); // Logs requests
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: ['http://localhost:3000', 'https://your-frontend-url.com'],
 }));
 
+// Rate Limiting
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests
+  message: 'Too many requests, please try again later.',
+});
+app.use('/api', apiLimiter);
+
+// Environment Variables
 const PORT = process.env.PORT || 3020;
 const MONGO_URI = process.env.MONGO_URI;
 const MY_SECRET_TOKEN = process.env.MY_SECRET_TOKEN;
 
 // Connect to MongoDB
-mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+mongoose.connect(MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
   .then(() => console.log('MongoDB Connected'))
   .catch((err) => {
-    console.error('Database Connection Error:', err);
-    process.exit(1);
+    console.error('Database Connection Error:', err.message);
+    process.exit(1); // Exit process on failure
   });
 
 mongoose.connection.once('open', () => {
@@ -42,6 +56,7 @@ mongoose.connection.once('open', () => {
   });
 });
 
+// JWT Authorization Middleware
 const authorization = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   if (!authHeader) {
@@ -73,7 +88,7 @@ app.post('/api/register', async (req, res) => {
     await newUser.save();
     res.status(201).send('Registered Successfully');
   } catch (error) {
-    console.error(error);
+    console.error('Error in /api/register:', error.message);
     res.status(500).send('Internal Server Error');
   }
 });
@@ -92,7 +107,7 @@ app.post('/api/login', async (req, res) => {
     const token = jwtToken.sign({ username }, MY_SECRET_TOKEN, { expiresIn: '1h' });
     res.send({ status: 'ok', token });
   } catch (error) {
-    console.error(error);
+    console.error('Error in /api/login:', error.message);
     res.status(500).send('Internal Server Error');
   }
 });
@@ -102,7 +117,7 @@ app.get('/api/products', authorization, async (req, res) => {
     const allProducts = await products.find({});
     res.send(allProducts);
   } catch (error) {
-    console.error(error);
+    console.error('Error in /api/products:', error.message);
     res.status(500).send('Internal Server Error');
   }
 });
@@ -116,7 +131,7 @@ app.get('/api/products/:id', authorization, async (req, res) => {
     }
     res.send(singleProduct);
   } catch (error) {
-    console.error(error);
+    console.error('Error in /api/products/:id:', error.message);
     res.status(500).send('Internal Server Error');
   }
 });
@@ -128,3 +143,9 @@ if (process.env.NODE_ENV === 'production') {
     res.sendFile(path.join(__dirname, 'frontend/build', 'index.html'));
   });
 }
+
+// Error Handling Middleware
+app.use((err, req, res, next) => {
+  console.error('Global Error Handler:', err.stack);
+  res.status(err.status || 500).send(err.message || 'Internal Server Error');
+});
